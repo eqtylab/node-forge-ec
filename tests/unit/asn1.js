@@ -10,9 +10,48 @@ var UTIL = require('../../lib/util');
       ASSERT.equal(ASN1.oidToDer('1.2.840.113549').toHex(), '2a864886f70d');
     });
 
+    it('should convert a 32b OID to DER', function() {
+      ASSERT.equal(ASN1.oidToDer('1.2.4294967295').toHex(), '2a8fffffff7f');
+    });
+
+    it('should not convert a >32b OID to DER', function() {
+      ASSERT.throws(
+        function() {
+          ASN1.oidToDer('1.2.4294967296');
+        },
+        /OID value too large; max is 32-bits./
+      );
+    });
+
     it('should convert an OID from DER', function() {
       var der = UTIL.hexToBytes('2a864886f70d');
       ASSERT.equal(ASN1.derToOid(der), '1.2.840.113549');
+    });
+
+    it('should convert a 32b OID from DER', function() {
+      var der = UTIL.hexToBytes('2a8fffffff7f');
+      ASSERT.equal(ASN1.derToOid(der), '1.2.4294967295');
+    });
+
+    it('should convert a >32b OID from DER', function() {
+      var der = UTIL.hexToBytes('2a9080808001');
+      ASSERT.equal(ASN1.derToOid(der), '1.2.4294967297');
+    });
+
+    it('should convert a max safe int OID from DER', function() {
+      var der = UTIL.hexToBytes('2a8fffffffffffff7f');
+      ASSERT.equal(ASN1.derToOid(der), '1.2.9007199254740991');
+    });
+
+    it('should not convert a >max safe int OID from DER', function() {
+      ASSERT.throws(
+        function() {
+          // '1.2.9007199254740992'
+          var der = UTIL.hexToBytes('2a9080808080808000');
+          console.log(ASN1.derToOid(der));
+        },
+        /OID value too large; max is 53-bits./
+      );
     });
 
     it('should convert INTEGER 0 to DER', function() {
@@ -441,7 +480,7 @@ var UTIL = require('../../lib/util');
           der = ASN1.toDer(asn1);
           if(options.roundtrip) {
             // byte comparisons for round-trip testing can fail due to
-            // symantically safe changes such as changing the length encoding.
+            // semantically safe changes such as changing the length encoding.
             // test a roundtrip for data where it makes sense.
             ASSERT.equal(
               UTIL.bytesToHex(bytes),
@@ -1047,7 +1086,7 @@ var UTIL = require('../../lib/util');
             // could extend out to any structure size:
             _add(b, '02 06 FF FF FF FF FF FF');
             // the roundtrip issue can exist for long lengths that could
-            // compress to short lenghts, this could be output as '02 02 01 23':
+            // compress to short lengths, this could be output as '02 02 01 23':
             _add(b, '02 81 02 01 23');
             // also an issue for indefinite length structures that will
             // have a known length later:
@@ -1278,7 +1317,7 @@ var UTIL = require('../../lib/util');
             UTIL.bytesToHex(derOut),
             UTIL.bytesToHex(_h2b(hout)));
         }
-        // optimial
+        // optimal
         _test('02 01 01', '02 01 01');
         _test('02 01 FF', '02 01 FF');
         _test('02 02 00 FF', '02 02 00 FF');

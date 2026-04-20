@@ -1,4 +1,5 @@
 require('./forge');
+require('./jsbn');
 require('./util');
 require('./md5');
 require('./sha1');
@@ -23,3 +24,4 @@ require('./pkcs7');
 require('./pkcs12');
 require('./tls');
 require('./ssh');
+require('../security');

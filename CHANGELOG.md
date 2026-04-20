@@ -1,11 +1,137 @@
 Forge ChangeLog
 ===============
 
+## 1.4.0 - 2026-03-24
+
+### Security
+- **HIGH**: Denial of Service in `BigInteger.modInverse()`
+  - A Denial of Service (DoS) vulnerability exists due to an infinite loop in
+    the `BigInteger.modInverse()` function (inherited from the bundled jsbn
+    library). When `modInverse()` is called with a zero value as input, the
+    internal Extended Euclidean Algorithm enters an unreachable exit condition,
+    causing the process to hang indefinitely and consume 100% CPU.
+  - Reported by Kr0emer.
+  - CVE ID: [CVE-2026-33891](https://www.cve.org/CVERecord?id=CVE-2026-33891)
+  - GHSA ID: [GHSA-5gfm-wpxj-wjgq](https://github.com/digitalbazaar/forge/security/advisories/GHSA-5m6q-g25r-mvwx)
+- **HIGH**: Signature forgery in RSA-PKCS due to ASN.1 extra field.
+  - RSASSA PKCS#1 v1.5 signature verification accepts forged signatures for low
+    public exponent keys (e=3). Attackers can forge signatures by stuffing
+    "garbage" bytes within the ASN.1 structure in order to construct a
+    signature that passes verification, enabling Bleichenbacher style forgery.
+    This issue is similar to CVE-2022-24771, but adds bytes in an addition
+    field within the ASN.1 structure, rather than outside of it.
+  - Additionally, forge does not validate that signatures include a minimum of
+    8 bytes of padding as defined by the specification, providing attackers
+    additional space to construct Bleichenbacher forgeries.
+  - Reported as part of a U.C. Berkeley security research project by:
+    - Austin Chu, Sohee Kim, and Corban Villa.
+  - CVE ID: [CVE-2026-33894](https://www.cve.org/CVERecord?id=CVE-2026-33894)
+  - GHSA ID: [GHSA-ppp5-5v6c-4jwp](https://github.com/digitalbazaar/forge/security/advisories/GHSA-ppp5-5v6c-4jwp)
+- **HIGH**: Signature forgery in Ed25519 due to missing S < L check.
+  - Ed25519 signature verification accepts forged non-canonical signatures
+    where the scalar S is not reduced modulo the group order (S >= L). A valid
+    signature and its S + L variant both verify in forge, while Node.js
+    crypto.verify (OpenSSL-backed) rejects the S + L variant, as defined by the
+    specification. This class of signature malleability has been exploited in
+    practice to bypass authentication and authorization logic (see
+    CVE-2026-25793, CVE-2022-35961). Applications relying on signature
+    uniqueness (i.e., dedup by signature bytes, replay tracking, signed-object
+    canonicalization checks) may be bypassed.
+  - Reported as part of a U.C. Berkeley security research project by:
+    - Austin Chu, Sohee Kim, and Corban Villa.
+  - CVE ID: [CVE-2026-33895](https://www.cve.org/CVERecord?id=CVE-2026-33895)
+  - GHSA ID: [GHSA-q67f-28xg-22rw](https://github.com/digitalbazaar/forge/security/advisories/GHSA-q67f-28xg-22rw)
+- **HIGH**: `basicConstraints` bypass in certificate chain verification.
+  - `pki.verifyCertificateChain()` does not enforce RFC 5280 `basicConstraints`
+    requirements when an intermediate certificate lacks both the
+    `basicConstraints` and `keyUsage` extensions. This allows any leaf
+    certificate (without these extensions) to act as a CA and sign other
+    certificates, which node-forge will accept as valid.
+  - Reported by Doruk Tan Ozturk (@peaktwilight) - doruk.ch
+  - CVE ID: [CVE-2026-33896](https://www.cve.org/CVERecord?id=CVE-2026-33896)
+  - GHSA ID: [GHSA-2328-f5f3-gj25](https://github.com/digitalbazaar/forge/security/advisories/GHSA-2328-f5f3-gj25)
+
+### Added
+- [oid] Added requested OID:
+  - `2.5.4.65` / `pseudonym`
+
+### Changed
+- [jsbn] Update to `jsbn` 1.4. Sync partly back to original style for easier
+  updates every decade or so.
+
+### Fixed
+- [jsbn] Fix `BigInteger.modInverse` to avoid an infinite loop and exit early
+  with zero when the target object value is <= 0. Zero may not be strictly
+  mathematically correct but aligns with current `jsbn` behavior returning zero
+  in other situations. The alternate of a `RangeError` would diverge from the
+  rest of the API.
+- [rsa] Fix padding length check according to RFC 2313 8.1 note 6. Padding is
+  required to be eight octets for block types 1 and 2.
+- [rsa] Fix RFC 8017 DigestInfo parsing to require a sequence length of two.
+- [ed25519] Add canonical signature scaler check for S < L.
+- [x590] Add chain verification check for absent `basicConstraints` on non-leaf
+  certificates.
+
+## 1.3.3 - 2025-12-02
+
+### Fixed
+- [pkcs12] Make digestAlgorithm parameters optional to fix PKCS#12/PFX issues
+  introduced in 1.3.2.
+
+## 1.3.2 - 2025-11-25
+
+### Security
+- **HIGH**: ASN.1 Validator Desynchronization
+  - An Interpretation Conflict (CWE-436) vulnerability in node-forge versions
+    1.3.1 and below enables remote, unauthenticated attackers to craft ASN.1
+    structures to desynchronize schema validations, yielding a semantic
+    divergence that may bypass downstream cryptographic verifications and
+    security decisions.
+  - Reported by Hunter Wodzenski.
+  - CVE ID: [CVE-2025-12816](https://www.cve.org/CVERecord?id=CVE-2025-12816)
+  - GHSA ID: [GHSA-5gfm-wpxj-wjgq](https://github.com/digitalbazaar/forge/security/advisories/GHSA-5gfm-wpxj-wjgq)
+- **HIGH**: ASN.1 Unbounded Recursion
+  - An Uncontrolled Recursion (CWE-674) vulnerability in node-forge versions
+    1.3.1 and below enables remote, unauthenticated attackers to craft deep
+    ASN.1 structures that trigger unbounded recursive parsing. This leads to a
+    Denial-of-Service (DoS) via stack exhaustion when parsing untrusted DER
+    inputs.
+  - Reported by Hunter Wodzenski.
+  - CVE ID: [CVE-2025-66031](https://www.cve.org/CVERecord?id=CVE-2025-66031)
+  - GHSA ID: [GHSA-554w-wpv2-vw27](https://github.com/digitalbazaar/forge/security/advisories/GHSA-554w-wpv2-vw27)
+- **MODERATE**: ASN.1 OID Integer Truncation
+  - An Integer Overflow (CWE-190) vulnerability in node-forge versions 1.3.1
+    and below enables remote, unauthenticated attackers to craft ASN.1
+    structures containing OIDs with oversized arcs. These arcs may be decoded
+    as smaller, trusted OIDs due to 32-bit bitwise truncation, enabling the
+    bypass of downstream OID-based security decisions.
+  - Reported by Hunter Wodzenski.
+  - CVE ID: [CVE-2025-66030](https://www.cve.org/CVERecord?id=CVE-2025-66030)
+  - GHSA ID: [GHSA-65ch-62r8-g69g](https://github.com/digitalbazaar/forge/security/advisories/GHSA-65ch-62r8-g69g)
+
+### Fixed
+- [asn1] Fix for vulnerability identified by CVE-2025-12816 PKCS#12 MAC
+  verification bypass due to missing macData enforcement and improper
+  asn1.validate routine.
+- [asn1] Add `fromDer()` max recursion depth check.
+  - Add a `asn1.maxDepth` global configurable maximum depth of 256.
+  - Add a `asn1.fromDer()` per-call `maxDepth` option.
+  - **NOTE**: The default maximum is assumed to be higher than needed for valid
+    data. If this assumption is false then this could be a breaking change.
+    Please file an issue if there are use cases that need a higher maximum.
+  - **NOTE**: The per-call `maxDepth` parameter has not been exposed up through
+    all of the API stack due to the complexities involved. Please file an issue
+    if there are use cases that require this instead of changing the default
+    maximum.
+- [asn1] Improve OID handling.
+  - Error on parsed OID values larger than `2**32 - 1`.
+  - Error on DER OID values larger than `2**53 - 1 `.
+
 ## 1.3.1 - 2022-03-29
 
-### Fixes
+### Fixed
 - RFC 3447 and RFC 8017 allow for optional `DigestAlgorithm` `NULL` parameters
-  for `sha*` algorithms and require `NULL` paramters for `md2` and `md5`
+  for `sha*` algorithms and require `NULL` parameters for `md2` and `md5`
   algorithms.
 
 ## 1.3.0 - 2022-03-17
@@ -117,11 +243,11 @@ Forge ChangeLog
   and is being removed rather than fixed.
 - **SECURITY**, **BREAKING**: Remove `forge.util.parseUrl()` (and
   `forge.http.parseUrl` alias) and use the [WHATWG URL
-  Standard](https://url.spec.whatwg.org/). `URL` is supported by modern browers
-  and modern Node.js. This change is needed to address URL parsing security
-  issues. If `forge.util.parseUrl()` is used directly or through `forge.xhr` or
-  `forge.http` APIs, and support is needed for environments without `URL`
-  support, then a polyfill must be used.
+  Standard](https://url.spec.whatwg.org/). `URL` is supported by modern
+  browsers and modern Node.js. This change is needed to address URL parsing
+  security issues. If `forge.util.parseUrl()` is used directly or through
+  `forge.xhr` or `forge.http` APIs, and support is needed for environments
+  without `URL` support, then a polyfill must be used.
 - **BREAKING**: Remove `forge.task` API. This API was never used, documented,
   or advertised by the maintainers. If anyone was using this API and wishes to
   continue development it in other project, please let the maintainers know.
